@@ -1,2 +1,3 @@
 # http-fast2
-Thrust http request
+
+Thrust HTTP fast, version 2 (not cannonical).
