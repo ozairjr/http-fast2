@@ -26,7 +26,6 @@ public class HttpFastWorkerBuilder implements ThrustWorkerThreadBuilder {
 		try {
 			return new HttpFastWorkerThread(pool, rootPath, routesFilePath, middlewaresFilePath, afterRequestFnFilePath);
 		} catch (RuntimeException | IOException | URISyntaxException e) {
-			e.printStackTrace();
 			throw e;
 		}
 	}

@@ -1,15 +1,14 @@
 package br.com.softbox.thrust.httpfast;
 
-import java.nio.ByteBuffer;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.nio.channels.Selector;
-import java.nio.channels.SelectionKey;
-import java.nio.channels.SelectableChannel;
-
-import java.net.ServerSocket;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 
 /**
@@ -24,6 +23,8 @@ public class SelectSockets {
 	public static final int DEFAULT_PORT_NUMBER = 8778;
 
 	private final ByteBuffer buffer;
+	protected ServerSocketChannel serverChannel;
+	protected ServerSocket serverSocket;
 	
 	public SelectSockets() {
 		// Use the same byte buffer for all channels. A single thread is
@@ -33,20 +34,19 @@ public class SelectSockets {
 
 	public void go(Integer portNumber) throws IOException {
 
-		int port = portNumber != null ? portNumber : DEFAULT_PORT_NUMBER;
-
-		System.out.println("Listening on port " + port);
+		final int port = portNumber != null ? portNumber : DEFAULT_PORT_NUMBER;
 
 		// Allocate an unbound server socket channel
-		ServerSocketChannel serverChannel = ServerSocketChannel.open();
+		serverChannel = ServerSocketChannel.open();
 		// Get the associated ServerSocket to bind it with
-		ServerSocket serverSocket = serverChannel.socket();
+		serverSocket = serverChannel.socket();
 		// Create a new Selector for use below
 		Selector selector = Selector.open();
-
+		
 		// Set the port the server channel will listen to
 		serverSocket.bind(new InetSocketAddress(port));
-
+		System.out.println("Listening on port " + port);
+		
 		// Set nonblocking mode for the listening socket
 		serverChannel.configureBlocking(false);
 
@@ -57,12 +57,10 @@ public class SelectSockets {
 			// This may block for a long time. Upon returning, the
 			// selected set contains keys of the ready channels.
 			int n = selector.select();
-
 			if (n == 0) {
 				// nothing to do
 				continue; 
 			}
-
 			// Get an iterator over the set of selected keys
 			Iterator<?> it = selector.selectedKeys().iterator();
 
