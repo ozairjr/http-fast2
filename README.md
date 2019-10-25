@@ -358,5 +358,5 @@ function minhaRotaXPTO(params, request, response) {
 
 Temos alguns projetos exemplos aqui no diretório [samples](./samples):
 
- [helloworld](./samples/helloworld): Projeto com os principais exemplos deste documento.
- [webapi](./samples/webapi): Projeto exemplo com acesso a um banco de dados.
+- [helloworld](./samples/helloworld): Projeto com os principais exemplos deste documento.
+- [webapi](./samples/webapi): Projeto exemplo com acesso a um banco de dados.
