@@ -300,7 +300,7 @@ Nós encontramos os seguintes valores no objeto `request`:
         "Port": "3000",
         "User-Agent": "curl/7.58.0",
         "Accept": "*/*",
-        "Cookie": "USER_TOKEN=OzFab",
+        "Cookie": "USER_TOKEN=OzFabWil",
         "X-Softbox": "LuizaLabs"
     },
     // Há outros campos que foram omitidos
@@ -356,4 +356,7 @@ function minhaRotaXPTO(params, request, response) {
 
 ## Códigos exemplos
 
-Temos alguns projetos exemplos aqui no diretório [samples](./samples).
+Temos alguns projetos exemplos aqui no diretório [samples](./samples):
+
+ [helloworld](./samples/helloworld): Projeto com os principais exemplos deste documento.
+ [webapi](./samples/webapi): Projeto exemplo com acesso a um banco de dados.
