@@ -30,9 +30,9 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 	private Value jsResponseCode;
 	private Value jsRouterCode;
 
-	public HttpFastWorkerThread(LocalWorkerThreadPool pool, String rootPath, String routesFilePath,
+	public HttpFastWorkerThread(LocalWorkerThreadPool pool, String routesFilePath,
 			String middlewaresFilePath, String afterRequestFnFilePath) throws IOException, URISyntaxException {
-		super(pool, rootPath, HTTP_FAST_BITCODE, JS_FILES);
+		super(pool, HTTP_FAST_BITCODE, JS_FILES);
 		this.buffer = ByteBuffer.allocate(1024 * 32);
 		setJsCode();
 		invokerJsRouterCode(routesFilePath, middlewaresFilePath, afterRequestFnFilePath);

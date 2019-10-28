@@ -18,10 +18,26 @@ public class HttpFast extends SelectSockets {
 	private final LocalWorkerThreadPool pool;
 	private final HttpFastWorkerBuilder threadBuilder;
 
-	public HttpFast(int minThreads, int maxThreads, String rootPath, String routesFilePath, String middlewaresFilePath,
+	private static HttpFast instance;
+
+	private HttpFast(int minThreads, int maxThreads, String rootPath, String routesFilePath, String middlewaresFilePath,
 			String afterRequestFnFilePath) throws Exception {
 		this.threadBuilder = new HttpFastWorkerBuilder(routesFilePath, middlewaresFilePath, afterRequestFnFilePath);
 		this.pool = new LocalWorkerThreadPool(minThreads, maxThreads, rootPath, this.threadBuilder);
+	}
+
+	public static synchronized HttpFast startServer(int minThreads, int maxThreads, String rootPath,
+			String routesFilePath, String middlewaresFilePath, String afterRequestFnFilePath) throws Exception {
+		if (instance != null) {
+			throw new RuntimeException("Server already started");
+		}
+		instance = new HttpFast(minThreads, maxThreads, rootPath, routesFilePath, middlewaresFilePath,
+				afterRequestFnFilePath);
+		return instance;
+	}
+	
+	public static synchronized HttpFast getInstance() {
+		return instance;
 	}
 
 	/**
