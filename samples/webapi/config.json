@@ -9,5 +9,8 @@
         "password": "senha",
         "urlConnection": "jdbc:postgresql://localhost:5432/mydb01?currentSchema=schema01",
         "driverClassName": "org.postgresql.Driver"
+    },
+    "jwt": {
+        "jwsKey": "0123456789abcdef"
     }
 }

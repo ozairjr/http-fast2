@@ -19,10 +19,6 @@ const testHello = () => {
     }
 }
 
-console.log('-------------------------------------------')
-console.log(' Tests for hello :-)')
-console.log('-------------------------------------------\n')
-
 testHello()
 
 

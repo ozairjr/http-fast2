@@ -6,10 +6,10 @@ const helloName = (params, request, response) => {
     const name = params.name || 'fulano'
     let id
     if (request.context && request.context.initTime) {
-        console.log('Getting id from request')
+        console.log('[hello-name] Getting id from request')
         id = request.context.initTime.getTime()
     } else {
-        console.log('Creating new id')
+        console.log('[hello-name]  Creating new id')
         id = new Date().getTime()
     }
     response.json({

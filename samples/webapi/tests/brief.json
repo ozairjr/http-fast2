@@ -1,15 +1,17 @@
 {
   "path": "src",
-  "name": "webapi",
-  "description": "Thrust sample project for http-fast2 and database",
-  "main": "src/index.js",
+  "name": "tests",
+  "description": "Thrust project",
+  "main": "cases/index.js",
   "version": "0.0.1",
   "dependencies": [
+    "majesty",
+    "ozairjr/http-client",
     "database",
     "filesystem@0.1.1",
     "ozairjr/http-fast2",
-    "ozairjr/auth",
     "com.fasterxml.uuid:java-uuid-generator:3.2.0",
-    "org.postgresql:postgresql:42.2.8"
+    "org.postgresql:postgresql:42.2.8",
+    "ozairjr/auth"
   ]
 }
