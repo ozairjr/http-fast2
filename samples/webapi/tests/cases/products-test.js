@@ -19,12 +19,11 @@ const exec = (describe, it, beforeEach, afterEach, expect, should, assert) => {
                 response = httpClient.get(`${URL}/api/v1/products/find-all`)
                     .headers({Cookie: cookie})
                     .fetch()
-                assert.ok(response)
                 const list = response.body
-                assert.ok(list)
-                assert.ok(list.length)
                 const product = list[0]
-                assert.ok(product.id)
+                if (!product.id) {
+                    throw new Error('No product id')
+                }
         })
     })
 }
