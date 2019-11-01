@@ -360,3 +360,11 @@ Temos alguns projetos exemplos aqui no diretório [samples](./samples):
 
 - [helloworld](./samples/helloworld): Projeto com os principais exemplos deste documento.
 - [webapi](./samples/webapi): Projeto exemplo com acesso a um banco de dados.
+
+## Montar o jar o para publicação
+
+Monte o `.jar` para publicação da seguinte forma:
+
+```sh
+./gradlew clean build copyJar
+```
