@@ -21,13 +21,8 @@ public class HttpFastWorkerBuilder implements ThrustWorkerThreadBuilder {
 	}
 
 	@Override
-	public ThrustWorkerThread build(LocalWorkerThreadPool pool)
-			throws IOException, URISyntaxException {
-		try {
-			return new HttpFastWorkerThread(pool, routesFilePath, middlewaresFilePath, afterRequestFnFilePath);
-		} catch (RuntimeException | IOException | URISyntaxException e) {
-			throw e;
-		}
+	public ThrustWorkerThread build(LocalWorkerThreadPool pool) throws IOException, URISyntaxException {
+		return new HttpFastWorkerThread(pool, routesFilePath, middlewaresFilePath, afterRequestFnFilePath);
 	}
 
 }

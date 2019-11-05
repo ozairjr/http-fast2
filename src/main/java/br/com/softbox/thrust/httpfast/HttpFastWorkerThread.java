@@ -17,7 +17,7 @@ import br.com.softbox.thrust.api.thread.ThrustWorkerThread;
 
 public class HttpFastWorkerThread extends ThrustWorkerThread {
 
-	private static final String HTTP_FAST_BITCODE = "ozairjr/http-fast2";
+	protected static final String HTTP_FAST_BITCODE = "ozairjr/http-fast2";
 	private static final List<String> JS_FILES = Arrays.asList("params.js", "request.js", "response.js", "router.js");
 	private static final Logger logger = Logger.getLogger(HttpFastWorkerThread.class.getName());
 
@@ -30,8 +30,8 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 	private Value jsResponseCode;
 	private Value jsRouterCode;
 
-	public HttpFastWorkerThread(LocalWorkerThreadPool pool, String routesFilePath,
-			String middlewaresFilePath, String afterRequestFnFilePath) throws IOException, URISyntaxException {
+	public HttpFastWorkerThread(LocalWorkerThreadPool pool, String routesFilePath, String middlewaresFilePath,
+			String afterRequestFnFilePath) throws IOException, URISyntaxException {
 		super(pool, HTTP_FAST_BITCODE, JS_FILES);
 		this.buffer = ByteBuffer.allocate(1024 * 32);
 		setJsCode();
@@ -59,14 +59,8 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 				try {
 					drainChannel(key);
 				} catch (Exception e) {
-					logger.log(Level.SEVERE, "Failed closing channel", e);
-
-					try {
-						key.channel().close();
-					} catch (IOException ex) {
-						logger.log(Level.WARNING, "Failed close key channel", e);
-					}
-					key.selector().wakeup();
+					logger.log(Level.SEVERE, "Failed drain channel", e);
+					closeAndWakeupKey();
 				}
 				key = null;
 				this.pool.returnThrustWorkerThread(this);
@@ -84,6 +78,19 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 		}
 	}
 
+	private void closeAndWakeupKey() {
+		try {
+			key.channel().close();
+		} catch (IOException ex) {
+			logger.log(Level.WARNING, "Failed close key channel", ex);
+		}
+		try {
+			key.selector().wakeup();
+		} catch (RuntimeException e) {
+			logger.log(Level.WARNING, "Failed to wakeup selector", e);
+		}
+	}
+
 	/**
 	 * Called to initiate a unit of work by this worker thread on the provided
 	 * SelectionKey object. This method is synchronized, as is the run( ) method, so
@@ -97,11 +104,7 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 
 		key.interestOps(key.interestOps() & (~SelectionKey.OP_READ));
 
-		if (!isAlive()) {
-			this.start();
-		} else {
-			this.notify();
-		}
+		startCurrentThread();
 	}
 
 	/**

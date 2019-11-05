@@ -17,7 +17,7 @@ const init = () => {
     httpServer.setMiddlewaresFilePath('src/utils/middlewares.js')
     httpServer.setAfterRequestFnFilePath('src/utils/middlewareBeforeResponse.js')
 
-    httpServer.startServer(serverPort, minThreads, maxThreads)
+    httpServer.startServer(serverPort, minThreads, maxThreads, () => console.log(`webapi listening on port ${serverPort}.`))
 }
 
 init()

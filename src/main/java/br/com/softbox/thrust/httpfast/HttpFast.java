@@ -2,8 +2,12 @@ package br.com.softbox.thrust.httpfast;
 
 import java.io.IOException;
 import java.nio.channels.SelectionKey;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 import br.com.softbox.thrust.api.thread.LocalWorkerThreadPool;
+import br.com.softbox.thrust.api.thread.ThrustWorkerThread;
 
 /**
  * Specialization of the SelectSockets class which uses a thread pool to service
@@ -15,15 +19,19 @@ import br.com.softbox.thrust.api.thread.LocalWorkerThreadPool;
  */
 public class HttpFast extends SelectSockets {
 
-	private final LocalWorkerThreadPool pool;
-	private final HttpFastWorkerBuilder threadBuilder;
+	private final LocalWorkerThreadPool httpFastPool;
+	private final HttpFastWorkerBuilder httpFastWorkerBuilder;
+
+	private List<ThrustWorkerThread> workersOnService;
 
 	private static HttpFast instance;
 
 	private HttpFast(int minThreads, int maxThreads, String rootPath, String routesFilePath, String middlewaresFilePath,
 			String afterRequestFnFilePath) throws Exception {
-		this.threadBuilder = new HttpFastWorkerBuilder(routesFilePath, middlewaresFilePath, afterRequestFnFilePath);
-		this.pool = new LocalWorkerThreadPool(minThreads, maxThreads, rootPath, this.threadBuilder);
+		this.httpFastWorkerBuilder = new HttpFastWorkerBuilder(routesFilePath, middlewaresFilePath,
+				afterRequestFnFilePath);
+		this.httpFastPool = new LocalWorkerThreadPool(minThreads, maxThreads, rootPath, this.httpFastWorkerBuilder);
+		this.workersOnService = new ArrayList<>(maxThreads);
 	}
 
 	public static synchronized HttpFast startServer(int minThreads, int maxThreads, String rootPath,
@@ -35,7 +43,7 @@ public class HttpFast extends SelectSockets {
 				afterRequestFnFilePath);
 		return instance;
 	}
-	
+
 	public static synchronized HttpFast getInstance() {
 		return instance;
 	}
@@ -53,9 +61,73 @@ public class HttpFast extends SelectSockets {
 	 *            the next select call.
 	 */
 	protected void readDataFromSocket(SelectionKey key) throws IOException {
-		HttpFastWorkerThread worker = (HttpFastWorkerThread) pool.getThrustWorkerThread();
-		if (worker != null) {
-			worker.serviceChannel(key);
+		HttpFastWorkerThread worker = (HttpFastWorkerThread) httpFastPool.getThrustWorkerThread();
+
+		worker.serviceChannel(key);
+		removeNotAliveWorkersAndAddNewWorker(worker);
+	}
+
+	private synchronized void removeNotAliveWorkersAndAddNewWorker(HttpFastWorkerThread newWorker) {
+		for (Iterator<ThrustWorkerThread> it = this.workersOnService.iterator(); it.hasNext();) {
+			ThrustWorkerThread worker = it.next();
+			if (!worker.isAlive() || worker.isInterrupted()) {
+				it.remove();
+			}
+		}
+		this.workersOnService.add(newWorker);
+	}
+
+	public Object[] stopServer() {
+		List<Exception> exceptions = new ArrayList<>();
+		stopServerSocket(exceptions);
+		stopServerChannel(exceptions);
+		shutdownPool(exceptions);
+		interruptLocalWorkers(exceptions);
+		return exceptions.toArray();
+	}
+
+	private void shutdownPool(List<Exception> exceptions) {
+		try {
+			this.httpFastPool.shutdown(true);
+		} catch (Exception e) {
+			exceptions.add(e);
+		}
+	}
+
+	private void stopServerChannel(List<Exception> exceptions) {
+		try {
+			if (this.serverChannel != null && this.serverChannel.isOpen()) {
+				this.serverChannel.close();
+			}
+		} catch (Exception e) {
+			exceptions.add(e);
+		} finally {
+			this.serverSocket = null;
+		}
+	}
+
+	private void stopServerSocket(List<Exception> exceptions) {
+		try {
+			if (this.serverSocket != null && !this.serverSocket.isClosed()) {
+				this.serverSocket.close();
+			}
+		} catch (Exception e) {
+			exceptions.add(e);
+		} finally {
+			this.serverSocket = null;
+		}
+	}
+
+	private synchronized void interruptLocalWorkers(List<Exception> exceptions) {
+		for (ThrustWorkerThread worker : this.workersOnService) {
+			if (worker.isAlive() || !worker.isInterrupted()) {
+				try {
+					worker.inactivate();
+					worker.interrupt();
+				} catch (Exception e) {
+					exceptions.add(e);
+				}
+			}
 		}
 	}
 }

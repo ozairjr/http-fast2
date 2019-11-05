@@ -25,7 +25,7 @@ public class SelectSockets {
 	private final ByteBuffer buffer;
 	protected ServerSocketChannel serverChannel;
 	protected ServerSocket serverSocket;
-	
+
 	public SelectSockets() {
 		// Use the same byte buffer for all channels. A single thread is
 		// servicing all the channels, so no danger of concurrent acccess.
@@ -42,10 +42,9 @@ public class SelectSockets {
 		serverSocket = serverChannel.socket();
 		// Create a new Selector for use below
 		Selector selector = Selector.open();
-		
+
 		// Set the port the server channel will listen to
 		serverSocket.bind(new InetSocketAddress(port));
-		System.out.println("Listening on port " + port);
 		
 		// Set nonblocking mode for the listening socket
 		serverChannel.configureBlocking(false);
@@ -53,36 +52,35 @@ public class SelectSockets {
 		// Register the ServerSocketChannel with the Selector
 		serverChannel.register(selector, SelectionKey.OP_ACCEPT);
 
-		while (true) {
+		while (this.serverSocket != null) {
 			// This may block for a long time. Upon returning, the
 			// selected set contains keys of the ready channels.
 			int n = selector.select();
-			if (n == 0) {
-				// nothing to do
-				continue; 
+			if (n > 0) {
+				iterateOverSelectKey(selector);
 			}
-			// Get an iterator over the set of selected keys
-			Iterator<?> it = selector.selectedKeys().iterator();
+		}
+	}
 
+	private void iterateOverSelectKey(Selector selector) throws IOException {
+		// Get an iterator over the set of selected keys
+		for (Iterator<?> it = selector.selectedKeys().iterator(); it.hasNext();) {
 			// Look at each key in the selected set
-			while (it.hasNext()) {
-				SelectionKey key = (SelectionKey) it.next();
+			SelectionKey key = (SelectionKey) it.next();
+			// Is a new connection coming in?
+			if (key.isAcceptable()) {
+				ServerSocketChannel server = (ServerSocketChannel) key.channel();
+				SocketChannel channel = server.accept();
 
-				// Is a new connection coming in?
-				if (key.isAcceptable()) {
-					ServerSocketChannel server = (ServerSocketChannel) key.channel();
-					SocketChannel channel = server.accept();
-
-					registerChannel(selector, channel, SelectionKey.OP_READ);
-				}
-
-				// Is there data to read on this channel?
-				if (key.isReadable()) {
-					readDataFromSocket(key);
-				}
-				// Remove key from selected set; it's been handled
-				it.remove();
+				registerChannel(selector, channel, SelectionKey.OP_READ);
 			}
+
+			// Is there data to read on this channel?
+			if (key.isReadable()) {
+				readDataFromSocket(key);
+			}
+			// Remove key from selected set; it's been handled
+			it.remove();
 		}
 	}
 
@@ -92,7 +90,8 @@ public class SelectSockets {
 	 */
 	protected void registerChannel(Selector selector, SelectableChannel channel, int ops) throws IOException {
 		if (channel == null) {
-			return; // could happen
+			// could happen
+			return;
 		}
 		// Set the new channel nonblocking
 		channel.configureBlocking(false);
@@ -110,8 +109,8 @@ public class SelectSockets {
 	 *            the next select call.
 	 */
 	protected void readDataFromSocket(SelectionKey key) throws IOException {
-		SocketChannel socketChannel = (SocketChannel) key.channel();
 		int count;
+		SocketChannel socketChannel = (SocketChannel) key.channel();
 
 		buffer.clear(); // Empty buffer
 
@@ -130,7 +129,7 @@ public class SelectSockets {
 			// you'd do something more useful than this.
 
 			// Empty buffer
-			buffer.clear(); 
+			buffer.clear();
 		}
 
 		if (count < 0) {
