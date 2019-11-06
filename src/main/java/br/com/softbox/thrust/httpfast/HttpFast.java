@@ -60,17 +60,18 @@ public class HttpFast extends SelectSockets {
 	 *            associated key. The selector will then de-register the channel on
 	 *            the next select call.
 	 */
+	@Override
 	protected void readDataFromSocket(SelectionKey key) throws IOException {
 		HttpFastWorkerThread worker = (HttpFastWorkerThread) httpFastPool.getThrustWorkerThread();
-
 		worker.serviceChannel(key);
 		removeNotAliveWorkersAndAddNewWorker(worker);
 	}
 
 	private synchronized void removeNotAliveWorkersAndAddNewWorker(HttpFastWorkerThread newWorker) {
+		ThrustWorkerThread worker;
 		for (Iterator<ThrustWorkerThread> it = this.workersOnService.iterator(); it.hasNext();) {
-			ThrustWorkerThread worker = it.next();
-			if (!worker.isAlive() || worker.isInterrupted()) {
+			worker = it.next();
+			if (!worker.isAlive()) {
 				it.remove();
 			}
 		}
@@ -86,6 +87,17 @@ public class HttpFast extends SelectSockets {
 		return exceptions.toArray();
 	}
 
+	protected synchronized static Object[] shutdown() {
+		Object[] ret;
+		if (instance != null) {
+			ret = instance.stopServer();
+			instance = null;
+		} else {
+			ret = new Object[0];
+		}
+		return ret;
+	}
+
 	private void shutdownPool(List<Exception> exceptions) {
 		try {
 			this.httpFastPool.shutdown(true);
@@ -96,19 +108,19 @@ public class HttpFast extends SelectSockets {
 
 	private void stopServerChannel(List<Exception> exceptions) {
 		try {
-			if (this.serverChannel != null && this.serverChannel.isOpen()) {
+			if (this.serverChannel != null) {
 				this.serverChannel.close();
 			}
 		} catch (Exception e) {
 			exceptions.add(e);
 		} finally {
-			this.serverSocket = null;
+			this.serverChannel = null;
 		}
 	}
 
 	private void stopServerSocket(List<Exception> exceptions) {
 		try {
-			if (this.serverSocket != null && !this.serverSocket.isClosed()) {
+			if (this.serverSocket != null) {
 				this.serverSocket.close();
 			}
 		} catch (Exception e) {
@@ -120,7 +132,7 @@ public class HttpFast extends SelectSockets {
 
 	private synchronized void interruptLocalWorkers(List<Exception> exceptions) {
 		for (ThrustWorkerThread worker : this.workersOnService) {
-			if (worker.isAlive() || !worker.isInterrupted()) {
+			if (worker.isAlive()) {
 				try {
 					worker.inactivate();
 					worker.interrupt();

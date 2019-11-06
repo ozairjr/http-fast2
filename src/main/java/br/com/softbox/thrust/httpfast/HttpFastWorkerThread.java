@@ -21,8 +21,6 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 	private static final List<String> JS_FILES = Arrays.asList("params.js", "request.js", "response.js", "router.js");
 	private static final Logger logger = Logger.getLogger(HttpFastWorkerThread.class.getName());
 
-	private final ByteBuffer buffer;
-	private boolean keepAlive;
 	private SelectionKey key;
 
 	private Value jsParamsCode;
@@ -33,7 +31,6 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 	public HttpFastWorkerThread(LocalWorkerThreadPool pool, String routesFilePath, String middlewaresFilePath,
 			String afterRequestFnFilePath) throws IOException, URISyntaxException {
 		super(pool, HTTP_FAST_BITCODE, JS_FILES);
-		this.buffer = ByteBuffer.allocate(1024 * 32);
 		setJsCode();
 		invokerJsRouterCode(routesFilePath, middlewaresFilePath, afterRequestFnFilePath);
 	}
@@ -54,17 +51,18 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 
 	@Override
 	public void run() {
+		SelectionKey currentKey;
 		while (active.get()) {
-			if (key != null) {
-				try {
-					drainChannel(key);
-				} catch (Exception e) {
-					logger.log(Level.SEVERE, "Failed drain channel", e);
-					closeAndWakeupKey();
-				}
-				key = null;
-				this.pool.returnThrustWorkerThread(this);
+			synchronized (this) {
+				currentKey =  this.key;
 			}
+			try {
+				drainChannel(currentKey);
+			} catch (Exception e) {
+				logger.log(Level.SEVERE, getName() + ": Failed drain channel", e);
+				closeAndWakeupKey(currentKey);
+			}
+			this.pool.returnThrustWorkerThread(this);
 			try {
 				synchronized (this) {
 					if (active.get()) {
@@ -72,20 +70,21 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 					}
 				}
 			} catch (InterruptedException e) {
+				logger.log(Level.WARNING, getName() + ": Thread was interrupeted", e);
+				this.active.set(false);
 				Thread.currentThread().interrupt();
-				throw new RuntimeException(e);
 			}
 		}
 	}
 
-	private void closeAndWakeupKey() {
+	private void closeAndWakeupKey(SelectionKey currentKey) {
 		try {
-			key.channel().close();
+			currentKey.channel().close();
 		} catch (IOException ex) {
 			logger.log(Level.WARNING, "Failed close key channel", ex);
 		}
 		try {
-			key.selector().wakeup();
+			currentKey.selector().wakeup();
 		} catch (RuntimeException e) {
 			logger.log(Level.WARNING, "Failed to wakeup selector", e);
 		}
@@ -99,11 +98,9 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 	 * set is updated to remove OP_READ. This will cause the selector to ignore
 	 * read-readiness for this channel while the worker thread is servicing it.
 	 */
-	synchronized void serviceChannel(SelectionKey key) {
-		this.key = key;
-
+	protected synchronized void serviceChannel(SelectionKey newKey) {
+		key = newKey;
 		key.interestOps(key.interestOps() & (~SelectionKey.OP_READ));
-
 		startCurrentThread();
 	}
 
@@ -114,25 +111,25 @@ public class HttpFastWorkerThread extends ThrustWorkerThread {
 	 * OP_READ and calls wakeup( ) on the selector so the selector will resume
 	 * watching this channel.
 	 */
-	void drainChannel(SelectionKey key) throws Exception {
-		SocketChannel channel = (SocketChannel) key.channel();
+	private void drainChannel(SelectionKey currentKey) throws Exception {
 		int bytesRead;
-		buffer.clear(); // Empty buffer
+		ByteBuffer buffer = ByteBuffer.allocate(1024 * 32);
+		SocketChannel channel = (SocketChannel) currentKey.channel();
 		// Loop while data is available; channel is nonblocking
 		while ((bytesRead = channel.read(buffer)) > 0) {
 			buffer.flip(); // make buffer readable
 			handleRequest(buffer, channel);
 			buffer.clear(); // Empty buffer
 		}
-		// Keep-alive not implemented yet
-		if (!keepAlive || bytesRead < 0) {
+		// Keep-alive not implemented yet: se nao keep alive
+		if (bytesRead < 0) {
 			channel.close();
 			return;
 		}
 		// Resume interest in OP_READ
-		key.interestOps(key.interestOps() | SelectionKey.OP_READ);
+		currentKey.interestOps(currentKey.interestOps() | SelectionKey.OP_READ);
 		// Cycle the selector so this key is active again
-		key.selector().wakeup();
+		currentKey.selector().wakeup();
 	}
 
 	private synchronized void handleRequest(ByteBuffer buffer, SocketChannel channel) {

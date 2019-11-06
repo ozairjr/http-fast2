@@ -3,12 +3,10 @@ package br.com.softbox.thrust.httpfast;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
-import java.nio.ByteBuffer;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 
 /**
@@ -19,44 +17,33 @@ import java.util.Iterator;
  *
  * @author Ron Hitchens (ron@ronsoft.com)
  */
-public class SelectSockets {
-	public static final int DEFAULT_PORT_NUMBER = 8778;
+public abstract class SelectSockets {
 
-	private final ByteBuffer buffer;
 	protected ServerSocketChannel serverChannel;
 	protected ServerSocket serverSocket;
 
 	public SelectSockets() {
 		// Use the same byte buffer for all channels. A single thread is
 		// servicing all the channels, so no danger of concurrent acccess.
-		this.buffer = ByteBuffer.allocateDirect(1024);
 	}
 
-	public void go(Integer portNumber) throws IOException {
-
-		final int port = portNumber != null ? portNumber : DEFAULT_PORT_NUMBER;
-
+	public void go(int portNumber) throws IOException {
 		// Allocate an unbound server socket channel
 		serverChannel = ServerSocketChannel.open();
 		// Get the associated ServerSocket to bind it with
 		serverSocket = serverChannel.socket();
 		// Create a new Selector for use below
 		Selector selector = Selector.open();
-
 		// Set the port the server channel will listen to
-		serverSocket.bind(new InetSocketAddress(port));
-		
+		serverSocket.bind(new InetSocketAddress(portNumber));
 		// Set nonblocking mode for the listening socket
 		serverChannel.configureBlocking(false);
-
 		// Register the ServerSocketChannel with the Selector
 		serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-
 		while (this.serverSocket != null) {
 			// This may block for a long time. Upon returning, the
 			// selected set contains keys of the ready channels.
-			int n = selector.select();
-			if (n > 0) {
+			if (selector.select() > 0) {
 				iterateOverSelectKey(selector);
 			}
 		}
@@ -64,17 +51,14 @@ public class SelectSockets {
 
 	private void iterateOverSelectKey(Selector selector) throws IOException {
 		// Get an iterator over the set of selected keys
+		SelectionKey key;
 		for (Iterator<?> it = selector.selectedKeys().iterator(); it.hasNext();) {
 			// Look at each key in the selected set
-			SelectionKey key = (SelectionKey) it.next();
+			key = (SelectionKey) it.next();
 			// Is a new connection coming in?
 			if (key.isAcceptable()) {
-				ServerSocketChannel server = (ServerSocketChannel) key.channel();
-				SocketChannel channel = server.accept();
-
-				registerChannel(selector, channel, SelectionKey.OP_READ);
+				registerChannel(selector, ((ServerSocketChannel) key.channel()).accept(), SelectionKey.OP_READ);
 			}
-
 			// Is there data to read on this channel?
 			if (key.isReadable()) {
 				readDataFromSocket(key);
@@ -89,14 +73,12 @@ public class SelectSockets {
 	 * of interest
 	 */
 	protected void registerChannel(Selector selector, SelectableChannel channel, int ops) throws IOException {
-		if (channel == null) {
-			// could happen
-			return;
+		if (channel != null) {
+			// Set the new channel nonblocking
+			channel.configureBlocking(false);
+			// Register it with the selector
+			channel.register(selector, ops);
 		}
-		// Set the new channel nonblocking
-		channel.configureBlocking(false);
-		// Register it with the selector
-		channel.register(selector, ops);
 	}
 
 	/**
@@ -108,33 +90,5 @@ public class SelectSockets {
 	 *            associated key. The selector will then de-register the channel on
 	 *            the next select call.
 	 */
-	protected void readDataFromSocket(SelectionKey key) throws IOException {
-		int count;
-		SocketChannel socketChannel = (SocketChannel) key.channel();
-
-		buffer.clear(); // Empty buffer
-
-		// Loop while data is available; channel is nonblocking
-		while ((count = socketChannel.read(buffer)) > 0) {
-			buffer.flip(); // Make buffer readable
-
-			// Send the data; don't assume it goes all at once
-			while (buffer.hasRemaining()) {
-				socketChannel.write(buffer);
-			}
-			// WARNING: the above loop is evil. Because
-			// it's writing back to the same nonblocking
-			// channel it read the data from, this code can
-			// potentially spin in a busy loop. In real life
-			// you'd do something more useful than this.
-
-			// Empty buffer
-			buffer.clear();
-		}
-
-		if (count < 0) {
-			// Close channel on EOF, invalidates the key
-			socketChannel.close();
-		}
-	}
+	protected abstract void readDataFromSocket(SelectionKey key) throws IOException;
 }

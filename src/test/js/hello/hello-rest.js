@@ -1,6 +1,7 @@
 exports = {
     hello(params, req, res) {
         const name = params.name
+        console.log(`js.hello(name=${name},header ? ${!!req.headers['x-name']}`)
         if (!name) {
             return res.status(500).json({
                 err: 1,
@@ -13,6 +14,24 @@ exports = {
         res.json({
             hello: name
         })
+    },
+    helloBody(params, req, res) {
+    	const x = params.x
+    	const y = params.y
+    	if (!x) {
+    		throw new Error('No x')
+    	}
+    	if (!y) {
+    		throw new Error('No y')
+    	}
+    	const z = x + y
+    	console.log(`js.helloBody(x=${x},y=${y})=>${z}`)
+    	res.json({z})
+    },
+    helloBody2(params, req, res) {
+    	const info = params.info
+    	const len = info === undefined || info === null ? -1 : ('' + info).length
+    	return res.json({len})
     },
     bye(params, _, res) {
         try {

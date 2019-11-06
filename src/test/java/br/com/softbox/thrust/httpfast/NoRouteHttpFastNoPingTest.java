@@ -8,7 +8,6 @@ import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterAll;
@@ -18,18 +17,17 @@ import org.junit.jupiter.api.Test;
 
 import br.com.softbox.thrust.core.Thrust;
 
-public class HelloHttpFastNoPingTest {
+public class NoRouteHttpFastNoPingTest {
 
-	private static final Path projectPath = Paths.get("src/test/js/hello");
+	private static final Path projectPath = Paths.get("src/test/js/no-route");
 	private static final Path projectLibPath = projectPath.resolve(".lib");
-	private static final Path projectMainPath = projectPath.resolve("hello-main.js");
+	private static final Path projectMainPath = projectPath.resolve("no-route.js");
 	private static final Path bitcodeRootPath = projectLibPath
 			.resolve(Paths.get("bitcodes", HttpFastWorkerThread.HTTP_FAST_BITCODE));
 	private static ExecutorService thrustExecutorService;
 
 	@BeforeAll
 	public static void prepare() throws Exception {
-		System.out.println("* Preparing for tests.");
 		mkdirOrClean();
 		copyBitcodes();
 		initThrust();
@@ -37,34 +35,33 @@ public class HelloHttpFastNoPingTest {
 
 	@AfterAll
 	public static void finish() throws Exception {
-		System.out.println("* Finishing tests.");
-		HttpFast httpFast = HttpFast.getInstance();
-		if (httpFast != null) {
-			Object[] ret = httpFast.stopServer();
-			System.out.println("Finished httpserver. Errors: " + ret.length);
-		}
+		Object[] ret = HttpFast.shutdown();
+		Assertions.assertNotNull(ret);
 		thrustExecutorService.shutdownNow();
-		System.out.println("......");
 	}
 
 	static void initThrust() throws Exception {
+		HttpFast.shutdown();
 		thrustExecutorService = Executors.newFixedThreadPool(1);
-		AtomicBoolean ok = new AtomicBoolean(true);
+		Exception[] error = new Exception[1];
 		thrustExecutorService.execute(() -> {
 			try {
 				Thrust.main(new String[] { projectMainPath.toAbsolutePath().toString() });
 			} catch (Exception e) {
-				ok.set(false);
+				error[0] = e;
 			}
 		});
 		Thread.sleep(3214);
-		Assertions.assertTrue(ok.get(), "Trhust must be running");
+		if (error[0] != null && error[0].toString().contains("Server already")) {
+
+		}
+		Assertions.assertNull(error[0]);
 	}
 
 	static void copyBitcodes() throws IOException {
 		Path bitcodesSrcPath = Paths.get("lib");
 		try (Stream<Path> walk = Files.list(bitcodesSrcPath)) {
-			walk.forEach(HelloHttpFastNoPingTest::copyTo);
+			walk.forEach(NoRouteHttpFastNoPingTest::copyTo);
 		}
 	}
 
@@ -93,7 +90,14 @@ public class HelloHttpFastNoPingTest {
 	}
 
 	@Test
-	public void justWakeUp() throws Exception {
-		System.out.println("Just wake up");
+	public void confirmWasInitated() throws Exception {
+		HttpFast httpFast = HttpFast.getInstance();
+		Assertions.assertNotNull(httpFast);
+		try {
+			HttpFast.startServer(1, 1, Thrust.getAppDirectory(), "", "", "");
+			Assertions.fail("Cannot run this");
+		} catch (RuntimeException e) {
+			Assertions.assertTrue(e.getMessage().contains("Server already started"));
+		}
 	}
 }

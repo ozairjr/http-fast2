@@ -2,18 +2,21 @@ package br.com.softbox.thrust.httpfast;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import javax.ws.rs.ProcessingException;
 import javax.ws.rs.client.Client;
 import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.client.WebTarget;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -28,6 +31,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import br.com.softbox.thrust.core.Thrust;
+import br.com.softbox.thrust.httpfast.dto.HelloBodyRequest;
+import br.com.softbox.thrust.httpfast.dto.HelloBodyResponse;
 
 @TestMethodOrder(Alphanumeric.class)
 public class HelloHttpFastSimpleTest {
@@ -59,17 +64,18 @@ public class HelloHttpFastSimpleTest {
 	}
 
 	static void initThrust() throws Exception {
+		HttpFast.shutdown();
 		thrustExecutorService = Executors.newFixedThreadPool(1);
-		AtomicBoolean ok = new AtomicBoolean(true);
+		Exception[] error = new Exception[1];
 		thrustExecutorService.execute(() -> {
 			try {
 				Thrust.main(new String[] { projectMainPath.toAbsolutePath().toString() });
 			} catch (Exception e) {
-				ok.set(false);
+				error[0] = e;
 			}
 		});
 		Thread.sleep(3214);
-		Assertions.assertTrue(ok.get(), "thrust must be running");
+		Assertions.assertNull(error[0]);
 	}
 
 	static void copyBitcodes() throws IOException {
@@ -111,6 +117,22 @@ public class HelloHttpFastSimpleTest {
 	private WebTarget target(String sufix) {
 		String url = String.format("http://localhost:3000%s%s", sufix.startsWith("/") ? "" : "/", sufix);
 		return restClient.target(url);
+	}
+
+	@Test
+	public void test0001Root() throws Exception {
+		WebTarget webTarget = target("");
+		Response response = webTarget.request(MediaType.TEXT_HTML).get();
+		Assertions.assertNotNull(response);
+		String str = response.readEntity(String.class);
+		Assertions.assertTrue(str.contains("Thrust is running"));
+	}
+
+	@Test
+	public void test0002SocketPing() throws Exception {
+		try (Socket socket = new Socket("localhost", 3000)) {
+			Assertions.assertTrue(true);
+		}
 	}
 
 	@Test
@@ -165,15 +187,110 @@ public class HelloHttpFastSimpleTest {
 	}
 
 	@Test
-	public void test10ByeInvalid() throws Exception {
-		WebTarget webTarget = target("api/bye/33");
-		Response response = webTarget.request(MediaType.APPLICATION_JSON).get();
+	public void test20HelloBodyXY() throws Exception {
+		HelloBodyRequest requestData = new HelloBodyRequest(1, 2);
+		WebTarget webTarget = target("/api/hello-body");
+		HelloBodyResponse responseData = webTarget.request(MediaType.APPLICATION_JSON)
+				.post(Entity.entity(requestData, MediaType.APPLICATION_JSON), HelloBodyResponse.class);
+		Assertions.assertNotNull(responseData);
+		Integer z = responseData.getZ();
+		Assertions.assertNotNull(z);
+		Assertions.assertEquals(z.intValue(), 3);
+	}
+
+	@Test
+	public void test21HelloBodyNoX() throws Exception {
+		HelloBodyRequest requestData = new HelloBodyRequest(0, 2);
+		WebTarget webTarget = target("/api/hello-body");
+		Response response = webTarget.request(MediaType.APPLICATION_JSON)
+				.post(Entity.entity(requestData, MediaType.APPLICATION_JSON));
 		Assertions.assertNotNull(response);
 		Assertions.assertEquals(response.getStatus(), 500);
 	}
 
 	@Test
-	public void test11ByeBreakApp() throws Exception {
+	public void test30HelloLongHead() throws Exception {
+		String name = "Cabeça de teia";
+		StringBuilder headTrash = new StringBuilder();
+		while (headTrash.length() < 2048) {
+			headTrash.append(headTrash.length() % 2 == 0 ? "a" : "b");
+		}
+		Response response = target("/api/hello").queryParam("name", name).request(MediaType.APPLICATION_JSON)
+				.header("x-name", headTrash.toString()).get();
+		Assertions.assertNotNull(response);
+		Assertions.assertEquals(response.getStatus(), 200);
+
+		Assertions.assertTrue(response.hasEntity());
+
+		String str = response.readEntity(String.class);
+		Assertions.assertNotNull(str);
+		Assertions.assertEquals(str, String.format("|%s|", name));
+	}
+
+	@Test
+	public void test40HelloBody2NoData() throws Exception {
+
+		Response response = target("/api/hello-body2").request(MediaType.APPLICATION_JSON).post(Entity.json("{}"));
+		Assertions.assertNotNull(response);
+		Assertions.assertEquals(response.getStatus(), 200);
+		@SuppressWarnings("unchecked")
+		Map<String, Object> ret = response.readEntity(Map.class);
+		Assertions.assertNotNull(ret);
+		Assertions.assertTrue(ret.containsKey("len"));
+		Number n = (Number) ret.get("len");
+		Assertions.assertNotNull(n);
+		Assertions.assertEquals(-1, n.intValue());
+
+	}
+
+	@Test
+	public void test40HelloBody2SimpleData() throws Exception {
+		String someInfo = "someinfo";
+		Map<String, Object> map = new HashMap<>();
+		map.put("info", someInfo);
+
+		Response response = target("/api/hello-body2").request(MediaType.APPLICATION_JSON).post(Entity.json(map));
+		Assertions.assertNotNull(response);
+		Assertions.assertEquals(response.getStatus(), 200);
+		@SuppressWarnings("unchecked")
+		Map<String, Object> ret = response.readEntity(Map.class);
+		Assertions.assertNotNull(ret);
+		Assertions.assertTrue(ret.containsKey("len"));
+		Number n = (Number) ret.get("len");
+		Assertions.assertNotNull(n);
+		Assertions.assertNotEquals(-1, n);
+		Assertions.assertEquals(someInfo.length(), n.intValue());
+
+	}
+
+	@Test
+	public void test40HelloBody2BigData() throws Exception {
+		String someInfo = String.format("%01024d", 1243);
+		Map<String, Object> map = new HashMap<>();
+		map.put("info", someInfo);
+
+		Response response = target("/api/hello-body2").request(MediaType.APPLICATION_JSON).post(Entity.json(map));
+		Assertions.assertNotNull(response);
+		Assertions.assertEquals(response.getStatus(), 200);
+		@SuppressWarnings("unchecked")
+		Map<String, Object> ret = response.readEntity(Map.class);
+		Assertions.assertNotNull(ret);
+		Assertions.assertTrue(ret.containsKey("len"));
+		Number n = (Number) ret.get("len");
+		Assertions.assertNotNull(n);
+		Assertions.assertEquals(someInfo.length(), n.intValue());
+	}
+
+	@Test
+	public void test90ByeInvalid() throws Exception {
+		WebTarget webTarget = target("api/bye/33");
+		Response response = webTarget.request(MediaType.APPLICATION_JSON).get();
+		Assertions.assertNotNull(response);
+		Assertions.assertEquals(500, response.getStatus());
+	}
+
+	@Test
+	public void test91ByeBreakApp() throws Exception {
 		try {
 			target("api/bye/1").request().buildGet().invoke();
 			Assertions.fail("Cannot run this");

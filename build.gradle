@@ -25,6 +25,8 @@ dependencies {
     testImplementation 'org.graalvm.tools:chromeinspector:19.2.0.1'
 	testImplementation 'org.glassfish.jersey.core:jersey-client:2.29.1'
 	testImplementation 'org.glassfish.jersey.inject:jersey-hk2:2.29.1'
+	testImplementation 'org.glassfish.jersey.media:jersey-media-json-jackson:2.29.1'
+	
 	testImplementation 'org.json:json:20190722'
 }
 
